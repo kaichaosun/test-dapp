@@ -12,38 +12,38 @@ import {
   connectionsComponent,
   permissionsComponent,
 } from './components/connections';
+import { encryptDecryptComponent } from './components/encryption/encrypt-decrypt';
+import { sendFormComponent } from './components/forms/send-form';
 import {
-  sendComponent,
-  erc20Component,
-  erc1155Component,
-  eip747Component,
-  erc721Component,
-} from './components/transactions';
+  emptyComponent,
+  ethereumChainInteractions,
+  jsonRpcResult,
+} from './components/interactions';
 import {
-  ppomMaliciousTransactionsAndSignatures,
   ppomMaliciousBatchingAndQueueing,
+  ppomMaliciousTransactionsAndSignatures,
   ppomMaliciousWarningBypasses,
 } from './components/ppom';
-import { encryptDecryptComponent } from './components/encryption/encrypt-decrypt';
+import { ensResolutionComponent } from './components/resolutions/ens-resolution';
 import {
   ethSignComponent,
+  malformedSignaturesComponent,
+  malformedTransactionsComponent,
   permitSignComponent,
   personalSignComponent,
   signTypedDataComponent,
-  signTypedDataVariantsComponent,
   signTypedDataV3Component,
   signTypedDataV4Component,
+  signTypedDataVariantsComponent,
   siweComponent,
-  malformedSignaturesComponent,
-  malformedTransactionsComponent,
 } from './components/signatures';
-import { ensResolutionComponent } from './components/resolutions/ens-resolution';
 import {
-  jsonRpcResult,
-  ethereumChainInteractions,
-  emptyComponent,
-} from './components/interactions';
-import { sendFormComponent } from './components/forms/send-form';
+  eip747Component,
+  erc1155Component,
+  erc20Component,
+  erc721Component,
+  sendComponent,
+} from './components/transactions';
 import { eip5792Component } from './components/transactions/eip5792';
 
 const {
@@ -265,6 +265,8 @@ export function updateSdkConnectionState(isConnected) {
 
 const detectEip6963 = () => {
   window.addEventListener('eip6963:announceProvider', (event) => {
+    console.log('Received eip6963:announceProvider event', event);
+    console.log('Received eip6963:announceProvider event detail', event.detail);
     if (event.detail.info.uuid) {
       eip6963Warning.hidden = true;
       eip6963Section.hidden = false;
@@ -289,10 +291,22 @@ export const setActiveProviderDetail = async (providerDetail) => {
   await initializeProvider();
 
   try {
+    console.log("eth_accounts:", globalContext.provider);
     const newAccounts = await globalContext.provider.request({
       method: 'eth_accounts',
     });
     handleNewAccounts(newAccounts);
+
+    const chainId = await globalContext.provider.request({
+      method: 'eth_chainId',
+    });
+    handleNewChain(chainId);
+
+    const networkId = await globalContext.provider.request({
+      method: 'net_version',
+    });
+    handleNewNetwork(networkId);
+
   } catch (err) {
     console.error('Error on init when getting accounts', err);
   }
@@ -371,6 +385,8 @@ const renderProviderDetails = () => {
   providerDetails.forEach((providerDetail) => {
     const { info, provider: provider_ } = providerDetail;
 
+    console.log("provider:", provider_);
+
     const content = JSON.stringify(
       {
         info,
@@ -413,6 +429,7 @@ export const handleNewAccounts = (newAccounts) => {
 };
 
 const handleNewChain = (chainId) => {
+  console.log("handle new chainId:", chainId);
   chainIdDiv.innerHTML = chainId;
   const networkId = parseInt(networkDiv.innerHTML, 10);
   globalContext.chainIdInt = parseInt(chainIdDiv.innerHTML, 16) || networkId;
@@ -443,15 +460,18 @@ function handleNewNetwork(networkId) {
 }
 
 const getNetworkAndChainId = async () => {
+  console.log("=== getNetworkAndChainId");
   try {
     const chainId = await globalContext.provider.request({
       method: 'eth_chainId',
     });
+    console.log("=== chainId:", chainId);
     handleNewChain(chainId);
 
     const networkId = await globalContext.provider.request({
       method: 'net_version',
     });
+    console.log("=== networkId:", networkId);
     handleNewNetwork(networkId);
 
     handleEIP1559Support();
@@ -725,6 +745,7 @@ const initialize = async () => {
   // We only want to set the activeProviderDetail is there is one instead of
   // assuming it exists
   if (providerDetails.length > 0) {
+    console.log('Setting active provider detail to first provider detail', providerDetails[0]);
     await setActiveProviderDetail(providerDetails[0]);
   }
   useWindowProviderButton.onclick = setActiveProviderDetailWindowEthereum;
